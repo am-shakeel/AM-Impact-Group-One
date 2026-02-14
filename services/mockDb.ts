@@ -1,4 +1,5 @@
-import { Job, LearningPath, InterviewQuestion, Event, NetworkGroup, ExperienceLevel, Meetup, Reservation } from '../types';
+
+import { Job, LearningPath, InterviewQuestion, Event, NetworkGroup, ExperienceLevel, Meetup, Reservation, ReservationStatus } from '../types';
 import { db } from '../firebase';
 import { 
   collection, 
@@ -184,7 +185,10 @@ const networks: NetworkGroup[] = [
 
 // Helper to calculate swag based on seat index/number
 // Logic Matches: (seatChar * 8) + seatNum + 1
-const calculateSwag = (seatNumber: string): string => {
+// EXPORTED for Admin usage
+export const calculateSwag = (seatNumber: string): string => {
+  if (!seatNumber) return 'Pending Assignment 🎁';
+
   // If seat is "A1", "H8", etc.
   if (/^[A-H][1-8]$/.test(seatNumber)) {
     const row = seatNumber.charCodeAt(0) - 65; // A=0, B=1...
@@ -192,10 +196,6 @@ const calculateSwag = (seatNumber: string): string => {
     
     // Position 1 to 64
     const position = row * 8 + col + 1;
-    
-    // Specific grid logic if needed, but using general buckets provided:
-    // "Seats 81–100 receive a Cap" - this implies we might expect > 64 seats or numeric seats.
-    // The previous logic handled numeric fallback.
     return getSwagFromPosition(position);
   }
 
@@ -242,7 +242,9 @@ export const getReservations = async (meetupId: string): Promise<Reservation[]> 
       reservations.push({ 
         id: doc.id, 
         ...data,
-        seatNumber: String(data.seatNumber || '') 
+        seatNumber: String(data.seatNumber || ''),
+        status: data.status || 'pending', // Default for legacy data
+        rejectionReason: data.rejectionReason || ''
       } as Reservation);
     });
     return reservations;
@@ -252,8 +254,8 @@ export const getReservations = async (meetupId: string): Promise<Reservation[]> 
   }
 };
 
-export const registerUser = async (data: Omit<Reservation, 'id' | 'registeredAt' | 'swag'>): Promise<Reservation> => {
-  // 1. Check if seat is already taken in DB
+export const registerUser = async (data: Omit<Reservation, 'id' | 'registeredAt' | 'swag' | 'status'>): Promise<Reservation> => {
+  // 1. Check if seat is already taken in DB (and not rejected) -- ONLY IF SEAT IS PROVIDED
   if (data.seatNumber) {
     const q = query(
       collection(db, "reservations"), 
@@ -261,20 +263,24 @@ export const registerUser = async (data: Omit<Reservation, 'id' | 'registeredAt'
       where("seatNumber", "==", data.seatNumber)
     );
     const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
+    
+    const activeReservation = snapshot.docs.find(doc => {
+        const d = doc.data();
+        return d.status !== 'rejected';
+    });
+
+    if (activeReservation) {
       throw new Error(`Seat ${data.seatNumber} is already booked.`);
     }
-  } else {
-    // Basic auto-assignment fallback
-    const existing = await getReservations(data.meetupId);
-    data.seatNumber = (existing.length + 65).toString(); 
   }
 
   // 2. Create Reservation Object
   const newReservationData = {
     ...data,
     registeredAt: new Date().toISOString(),
-    swag: calculateSwag(data.seatNumber)
+    // Calculate swag if seat is provided, else pending
+    swag: data.seatNumber ? calculateSwag(data.seatNumber) : 'TBD',
+    status: 'pending' as ReservationStatus
   };
 
   // 3. Add to Firestore
@@ -294,15 +300,24 @@ export const registerUser = async (data: Omit<Reservation, 'id' | 'registeredAt'
   return { id: docRef.id, ...newReservationData };
 };
 
-export const deleteReservation = async (reservationId: string, meetupId: string): Promise<void> => {
-  await deleteDoc(doc(db, "reservations", reservationId));
+export const deleteReservation = async (reservationId: string, meetupId?: string): Promise<void> => {
+  if (!reservationId) return;
   
-  // Decrement registration count
-  const meetupRef = doc(db, "meetups", meetupId);
-  const meetupSnap = await getDoc(meetupRef);
-  if (meetupSnap.exists()) {
-    const current = meetupSnap.data().registrations || 0;
-    await updateDoc(meetupRef, { registrations: Math.max(0, current - 1) });
+  try {
+    await deleteDoc(doc(db, "reservations", reservationId));
+    
+    // Decrement registration count only if meetupId is provided and valid
+    if (meetupId) {
+      const meetupRef = doc(db, "meetups", meetupId);
+      const meetupSnap = await getDoc(meetupRef);
+      if (meetupSnap.exists()) {
+        const current = meetupSnap.data().registrations || 0;
+        await updateDoc(meetupRef, { registrations: Math.max(0, current - 1) });
+      }
+    }
+  } catch (e) {
+    console.error("Error in deleteReservation service:", e);
+    throw e;
   }
 };
 

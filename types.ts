@@ -51,6 +51,13 @@ export interface NetworkGroup {
   members: string;
 }
 
+export interface ReservedSeatsConfig {
+  hosts: number;
+  presenters: number;
+  volunteers: number;
+  sponsors: number;
+}
+
 export interface Meetup {
   id: string;
   title: string;
@@ -60,7 +67,19 @@ export interface Meetup {
   type: 'Past' | 'Present' | 'Future';
   capacity: number;
   registrations: number;
+  registrationMode?: 'registration' | 'booking' | 'both';
+  
+  // Seat Configuration
+  seatsPerTable?: number; // Default 8
+  reservedSeats?: ReservedSeatsConfig;
+  
+  // Registration Timing
+  registrationStart?: string; // ISO datetime
+  registrationEnd?: string; // ISO datetime
+  isRegistrationClosed?: boolean; // Manual override
 }
+
+export type ReservationStatus = 'pending' | 'confirmed' | 'rejected';
 
 export interface Reservation {
   id: string;
@@ -75,4 +94,6 @@ export interface Reservation {
   swag: string;
   registeredAt: string;
   isHidden?: boolean;
+  status: ReservationStatus;
+  rejectionReason?: string;
 }
