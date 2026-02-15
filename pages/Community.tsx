@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { getNetworks } from '../services/mockDb';
 import { NetworkGroup } from '../types';
@@ -24,7 +25,7 @@ const Community: React.FC = () => {
     <div className="bg-slate-50 min-h-screen py-12">
       <div className="container mx-auto px-4 max-w-4xl">
         <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Connect with AM Impact Communities</h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Connect with the Community</h1>
           <p className="text-slate-600">Join the conversation where it happens.</p>
         </div>
 
@@ -57,7 +58,7 @@ const Community: React.FC = () => {
         <div className="mt-12 bg-white rounded-xl p-8 border border-slate-200 shadow-sm text-center">
           <h2 className="text-xl font-bold mb-4">Community Guidelines</h2>
           <p className="text-slate-600 text-sm max-w-2xl mx-auto">
-            AM Impact Group communities are focused on professional growth. We encourage knowledge sharing, 
+            These communities are focused on professional growth. We encourage knowledge sharing, 
             mentorship, and job referrals. Please keep conversations respectful and relevant to ServiceNow.
           </p>
         </div>

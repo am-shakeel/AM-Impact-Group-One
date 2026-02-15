@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { getEvents } from '../services/mockDb';
 import { Event } from '../types';
@@ -42,7 +43,7 @@ const Events: React.FC = () => {
                       {getIcon(event.type)} {event.type}
                     </span>
                     <span className="text-sm font-semibold text-am-600 bg-am-50 px-2 py-1 rounded border border-am-100">
-                      AM Impact
+                      AM Shakeel
                     </span>
                   </div>
                   

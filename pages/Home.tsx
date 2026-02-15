@@ -1,8 +1,29 @@
-import React from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, BookOpen, Megaphone, Utensils, Cpu, ChevronRight } from 'lucide-react';
+import { getProfile } from '../services/mockDb';
+import { UserProfile } from '../types';
+
+// Extend Window interface for LinkedIn script
+declare global {
+  interface Window {
+    LI: any;
+  }
+}
+
+// Using a reliable placeholder service for the logo since local asset is missing
+const AM_LOGO_PATH = "https://ui-avatars.com/api/?name=AM&background=0284c7&color=fff&size=512&bold=true";
 
 const Home: React.FC = () => {
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    getProfile().then(data => {
+      setProfile(data);
+    });
+  }, []);
+
   return (
     <div className="bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
       
@@ -14,6 +35,11 @@ const Home: React.FC = () => {
         <div className="absolute top-40 -left-20 w-72 h-72 bg-marketing-500 rounded-full filter blur-[80px] opacity-20"></div>
 
         <div className="container mx-auto px-4 py-24 md:py-32 relative z-10 text-center">
+          <img 
+            src={AM_LOGO_PATH} 
+            alt="AM Shakeel Logo" 
+            className="w-32 h-auto mx-auto mb-8 drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] animate-fade-in-up rounded-2xl" 
+          />
           <h1 className="text-4xl md:text-7xl font-bold mb-6 tracking-tight">
             Empowering Futures. <br />
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-am-400 via-marketing-500 to-tech-500">
@@ -21,15 +47,15 @@ const Home: React.FC = () => {
             </span>
           </h1>
           <p className="text-xl text-slate-300 max-w-3xl mx-auto mb-10 leading-relaxed">
-            AM Impact Group is a diversified conglomerate building ecosystems in Education, Marketing, Food, and Technology. We create value that resonates.
+            I am Shakeel. This platform bridges Education, Marketing, Food, and Technology. Welcome to my digital ecosystem.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
              <Link to="/academy" className="bg-white text-slate-900 px-8 py-3 rounded-full font-bold hover:bg-slate-100 transition flex items-center justify-center">
-               Explore Our Divisions
+               Explore Initiatives
              </Link>
-             <button onClick={() => document.getElementById('about')?.scrollIntoView({behavior:'smooth'})} className="border border-slate-600 text-white px-8 py-3 rounded-full font-semibold hover:border-white transition">
-               About The Group
-             </button>
+             <Link to="/about" className="border border-slate-600 text-white px-8 py-3 rounded-full font-semibold hover:border-white transition flex items-center justify-center">
+               About Me
+             </Link>
           </div>
         </div>
       </section>
@@ -47,7 +73,7 @@ const Home: React.FC = () => {
                <BookOpen size={24} />
              </div>
              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">AM Academy</h2>
-             <p className="text-slate-600 dark:text-slate-400 mb-6">Bridging Education & Employment. Master ServiceNow, SAP, and crack competitive exams.</p>
+             <p className="text-slate-600 dark:text-slate-400 mb-6">Bridging Education & Employment. My curated paths for ServiceNow and SAP mastery.</p>
              <span className="text-am-600 font-bold flex items-center text-sm group-hover:translate-x-2 transition-transform">
                Visit Education Hub <ChevronRight size={16} />
              </span>
@@ -62,7 +88,7 @@ const Home: React.FC = () => {
                <Megaphone size={24} />
              </div>
              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">AM Marketing</h2>
-             <p className="text-slate-600 dark:text-slate-400 mb-6">Amplify Your Impact. Strategic branding, corporate events, and high-value sponsorships.</p>
+             <p className="text-slate-600 dark:text-slate-400 mb-6">Amplify Your Impact. Strategic ideas on branding, events, and community building.</p>
              <span className="text-marketing-600 font-bold flex items-center text-sm group-hover:translate-x-2 transition-transform">
                Explore Services <ChevronRight size={16} />
              </span>
@@ -77,9 +103,9 @@ const Home: React.FC = () => {
                <Utensils size={24} />
              </div>
              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">AM Foods</h2>
-             <p className="text-slate-600 dark:text-slate-400 mb-6">Taste of Tradition, Speed of Cloud. Cloud kitchens and premium packaged foods.</p>
+             <p className="text-slate-600 dark:text-slate-400 mb-6">Taste of Tradition. Exploring cloud kitchens and modern culinary ventures.</p>
              <span className="text-foods-600 font-bold flex items-center text-sm group-hover:translate-x-2 transition-transform">
-               View Menu <ChevronRight size={16} />
+               View Concepts <ChevronRight size={16} />
              </span>
           </Link>
 
@@ -92,7 +118,7 @@ const Home: React.FC = () => {
                <Cpu size={24} />
              </div>
              <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">AM Tech</h2>
-             <p className="text-slate-600 dark:text-slate-400 mb-6">Automating the Future. AI solutions, workflow automation, and custom software.</p>
+             <p className="text-slate-600 dark:text-slate-400 mb-6">Automating the Future. My thoughts and projects on AI, workflows, and software.</p>
              <span className="text-tech-600 font-bold flex items-center text-sm group-hover:translate-x-2 transition-transform">
                See Solutions <ChevronRight size={16} />
              </span>
@@ -101,27 +127,32 @@ const Home: React.FC = () => {
         </div>
       </section>
 
-      {/* About Section */}
-      <section id="about" className="py-20 bg-white dark:bg-slate-900 transition-colors duration-200">
+      {/* About Teaser Section */}
+      <section className="py-20 bg-white dark:bg-slate-900 transition-colors duration-200">
         <div className="container mx-auto px-4 text-center max-w-4xl">
-           <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">Who We Are</h2>
-           <p className="text-lg text-slate-600 dark:text-slate-300 leading-relaxed mb-8">
-             AM Impact Group Pvt Ltd is more than just a company; it's a movement. Founded with a vision to integrate critical sectors of the modern economy, we strive for excellence in every venture. Whether we are training the next generation of tech leaders, serving delicious meals, or automating complex business processes, our core value remains the same: <strong>Impact.</strong>
+           <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-6">
+             {profile ? profile.headline : 'About Me'}
+           </h2>
+           
+           <p className="text-lg text-slate-600 dark:text-slate-300 leading-relaxed mb-10 whitespace-pre-wrap line-clamp-4">
+             {profile ? profile.bio : "Loading profile..."}
            </p>
-           <div className="flex flex-wrap justify-center gap-8 mt-12">
-             <div className="text-center">
-               <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2">4</div>
-               <div className="text-sm text-slate-500 uppercase tracking-wide">Divisions</div>
+           
+           <Link to="/about" className="inline-flex items-center text-am-600 font-bold hover:text-am-800 hover:underline">
+              Read full story and initiatives <ArrowRight size={18} className="ml-2" />
+           </Link>
+
+           {/* Stats */}
+           {profile && profile.stats && (
+             <div className="flex flex-wrap justify-center gap-8 mt-12 border-t border-slate-100 dark:border-slate-800 pt-8">
+                {profile.stats.map((stat, idx) => (
+                  <div key={idx} className="text-center">
+                    <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2">{stat.value}</div>
+                    <div className="text-sm text-slate-500 uppercase tracking-wide">{stat.label}</div>
+                  </div>
+                ))}
              </div>
-             <div className="text-center">
-               <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2">1200+</div>
-               <div className="text-sm text-slate-500 uppercase tracking-wide">Community Strong</div>
-             </div>
-             <div className="text-center">
-               <div className="text-4xl font-bold text-slate-900 dark:text-white mb-2">3</div>
-               <div className="text-sm text-slate-500 uppercase tracking-wide">Cities Present</div>
-             </div>
-           </div>
+           )}
         </div>
       </section>
 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Users, Gift, CheckCircle } from 'lucide-react';
 
@@ -6,7 +7,7 @@ const Referral: React.FC = () => {
     <div className="bg-white min-h-screen">
       <div className="bg-am-900 text-white py-20">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-4xl font-bold mb-4">AM Impact Referral Program</h1>
+          <h1 className="text-4xl font-bold mb-4">Community Referral Program</h1>
           <p className="text-am-100 text-lg">Help a friend land their dream job and get rewarded.</p>
         </div>
       </div>

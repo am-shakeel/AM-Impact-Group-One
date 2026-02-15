@@ -1,7 +1,29 @@
-import React from 'react';
-import { Cpu, Workflow, Database, Code } from 'lucide-react';
+
+import React, { useState, useEffect } from 'react';
+import { Cpu, Workflow, Database, Code, Terminal } from 'lucide-react';
+import { getInitiatives } from '../services/mockDb';
+import { Initiative } from '../types';
 
 const Tech: React.FC = () => {
+  const [content, setContent] = useState<Initiative[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getInitiatives('tech').then(data => {
+        setContent(data);
+        setLoading(false);
+    });
+  }, []);
+
+  const getIcon = (name: string) => {
+    switch(name.toLowerCase()) {
+        case 'workflow': return <Workflow size={32} className="text-tech-600 mb-4" />;
+        case 'database': return <Database size={32} className="text-tech-600 mb-4" />;
+        case 'code': return <Code size={32} className="text-tech-600 mb-4" />;
+        default: return <Terminal size={32} className="text-tech-600 mb-4" />;
+    }
+  }
+
   return (
     <div className="bg-slate-50 dark:bg-slate-950 min-h-screen">
       {/* Hero */}
@@ -17,23 +39,37 @@ const Tech: React.FC = () => {
 
       {/* Solutions Grid */}
       <section className="py-20 container mx-auto px-4">
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-xl border-t-4 border-tech-500 shadow-sm">
-            <Workflow size={32} className="text-tech-600 mb-4" />
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Workflow Automation</h3>
-            <p className="text-slate-600 dark:text-slate-400">ServiceNow implementation and custom workflow designs to streamline business operations.</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-xl border-t-4 border-tech-500 shadow-sm">
-            <Database size={32} className="text-tech-600 mb-4" />
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">AI & ML Solutions</h3>
-            <p className="text-slate-600 dark:text-slate-400">Predictive intelligence and chatbot integration to enhance customer experience.</p>
-          </div>
-          <div className="bg-white dark:bg-slate-900 p-8 rounded-xl border-t-4 border-tech-500 shadow-sm">
-            <Code size={32} className="text-tech-600 mb-4" />
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Custom Development</h3>
-            <p className="text-slate-600 dark:text-slate-400">Full-stack web and mobile application development tailored to your enterprise needs.</p>
-          </div>
-        </div>
+        {loading ? (
+             <div className="text-center py-10 text-slate-500">Loading solutions...</div>
+        ) : content.length > 0 ? (
+           <div className="grid md:grid-cols-3 gap-8">
+              {content.map(item => (
+                 <div key={item.id} className="bg-white dark:bg-slate-900 p-8 rounded-xl border-t-4 border-tech-500 shadow-sm">
+                    {getIcon(item.iconName || '')}
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{item.title}</h3>
+                    <p className="text-slate-600 dark:text-slate-400">{item.description}</p>
+                 </div>
+              ))}
+           </div>
+        ) : (
+           <div className="grid md:grid-cols-3 gap-8">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-xl border-t-4 border-tech-500 shadow-sm">
+                <Workflow size={32} className="text-tech-600 mb-4" />
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Workflow Automation</h3>
+                <p className="text-slate-600 dark:text-slate-400">ServiceNow implementation and custom workflow designs to streamline business operations.</p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-xl border-t-4 border-tech-500 shadow-sm">
+                <Database size={32} className="text-tech-600 mb-4" />
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">AI & ML Solutions</h3>
+                <p className="text-slate-600 dark:text-slate-400">Predictive intelligence and chatbot integration to enhance customer experience.</p>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-xl border-t-4 border-tech-500 shadow-sm">
+                <Code size={32} className="text-tech-600 mb-4" />
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">Custom Development</h3>
+                <p className="text-slate-600 dark:text-slate-400">Full-stack web and mobile application development tailored to your enterprise needs.</p>
+            </div>
+           </div>
+        )}
       </section>
 
       {/* Contact */}

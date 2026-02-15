@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Calendar, MapPin, Building2 } from 'lucide-react';
 
@@ -9,7 +10,7 @@ const JobMela: React.FC = () => {
         <div className="absolute inset-0 bg-am-600 opacity-20"></div>
         <div className="relative z-10 text-center px-4">
           <div className="inline-block bg-white text-slate-900 px-4 py-1 rounded mb-4 font-bold text-sm tracking-widest uppercase">
-            Powered by AM Impact Group
+            Initiative by AM Shakeel
           </div>
           <h1 className="text-4xl md:text-5xl font-black text-white mb-2 tracking-tight">MEGA JOB MELA 2023</h1>
           <p className="text-xl text-am-300">Hyderabad Edition</p>
@@ -41,7 +42,7 @@ const JobMela: React.FC = () => {
               </div>
               <p className="text-slate-600 leading-relaxed">
                 Join the largest gathering of ServiceNow professionals in the region. Whether you are a fresh graduate looking 
-                to start your journey or an experienced architect seeking a new challenge, AM Impact's Job Mela brings opportunities directly to you.
+                to start your journey or an experienced architect seeking a new challenge, this Job Mela brings opportunities directly to you.
               </p>
             </div>
 
@@ -61,7 +62,7 @@ const JobMela: React.FC = () => {
           <div className="space-y-6">
             <div className="bg-white p-6 rounded-xl shadow-lg border-t-4 border-am-500">
               <h3 className="text-xl font-bold mb-4">Registration</h3>
-              <p className="text-sm text-slate-600 mb-6">Entry is free for AM Impact Community members. Walk-ins allowed but registration is preferred.</p>
+              <p className="text-sm text-slate-600 mb-6">Entry is free for Community members. Walk-ins allowed but registration is preferred.</p>
               <button className="w-full bg-am-600 text-white py-3 rounded-lg font-bold hover:bg-am-700 transition mb-3">
                 Register as Candidate
               </button>
@@ -72,7 +73,7 @@ const JobMela: React.FC = () => {
 
             <div className="bg-gradient-to-br from-am-800 to-slate-900 p-6 rounded-xl text-white">
               <h3 className="font-bold text-lg mb-2">Prepare for Success</h3>
-              <p className="text-sm text-am-100 mb-4">Check out our Interview Prep section before attending.</p>
+              <p className="text-sm text-am-100 mb-4">Check out the Interview Prep section before attending.</p>
               <a href="#/interview" className="text-sm font-bold text-white underline hover:text-am-300">Go to Interview Prep &rarr;</a>
             </div>
           </div>

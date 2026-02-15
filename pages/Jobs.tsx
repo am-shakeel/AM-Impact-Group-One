@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { getJobs } from '../services/mockDb';
 import { Job } from '../types';
@@ -35,7 +36,7 @@ const Jobs: React.FC = () => {
             <h1 className="text-3xl font-bold text-slate-900">Job Openings</h1>
             <p className="text-slate-600 flex items-center gap-2 mt-1">
               <span className="h-px w-8 bg-am-600 inline-block"></span>
-              Powered by AM Impact Group
+              Curated by AM Shakeel
             </p>
           </div>
           <div className="w-full md:w-1/3 mt-4 md:mt-0 relative">
@@ -67,9 +68,14 @@ const Jobs: React.FC = () => {
                     </div>
                     <p className="mt-3 text-slate-600 text-sm max-w-2xl">{job.description}</p>
                   </div>
-                  <button className="bg-slate-900 text-white px-6 py-2 rounded-lg font-medium hover:bg-am-600 transition whitespace-nowrap">
+                  <a 
+                    href={job.applyLink || '#'} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="bg-slate-900 text-white px-6 py-2 rounded-lg font-medium hover:bg-am-600 transition whitespace-nowrap inline-block text-center"
+                  >
                     Apply Now
-                  </button>
+                  </a>
                 </div>
               ))
             ) : (

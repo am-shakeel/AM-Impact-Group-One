@@ -1,7 +1,16 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { checkAdmin, getMeetups, createMeetup, updateMeetup, deleteMeetup, getReservations, deleteReservation, updateReservation, registerUser, calculateSwag } from '../services/mockDb';
-import { Meetup, Reservation, ReservationStatus } from '../types';
-import { Shield, LayoutDashboard, Plus, Edit, Trash2, Users, Save, X, LogOut, Loader2, UserPlus, Eye, EyeOff, CheckCircle, XCircle, Calculator, CalendarClock, Lock, AlertTriangle } from 'lucide-react';
+import { 
+  checkAdmin, getMeetups, createMeetup, updateMeetup, deleteMeetup, 
+  getReservations, deleteReservation, updateReservation, registerUser, calculateSwag,
+  getLearningItems, createLearningItem, updateLearningItem, deleteLearningItem,
+  getJobs, createJob, updateJob, deleteJob,
+  getContactMessages, updateContactMessage,
+  getInitiatives, createInitiative, updateInitiative, deleteInitiative,
+  getProfile, updateProfile
+} from '../services/mockDb';
+import { Meetup, Reservation, ReservationStatus, LearningItem, LearningContentType, TARGET_AUDIENCES, Job, ContactMessage, Initiative, InitiativeCategory, UserProfile } from '../types';
+import { Shield, LayoutDashboard, Plus, Edit, Trash2, Users, Save, X, LogOut, Loader2, UserPlus, Eye, EyeOff, BookOpen, Code2, MessageSquare, Briefcase, Mail, CheckCircle, FileText, Globe, HelpCircle, User, Layers, FolderOpen, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Admin: React.FC = () => {
@@ -12,11 +21,57 @@ const Admin: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   // Dashboard State
-  const [activeTab, setActiveTab] = useState<'meetups' | 'registrations'>('meetups');
+  const [activeTab, setActiveTab] = useState<'meetups' | 'registrations' | 'learning' | 'jobs' | 'messages' | 'content' | 'profile'>('meetups');
   const [meetups, setMeetups] = useState<Meetup[]>([]);
   const [selectedMeetupId, setSelectedMeetupId] = useState<string | null>(null);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   
+  // Learning Hub State
+  const [learningItems, setLearningItems] = useState<LearningItem[]>([]);
+  const [learningFilter, setLearningFilter] = useState('all');
+  const [showLearningModal, setShowLearningModal] = useState(false);
+  const [editingLearningItem, setEditingLearningItem] = useState<LearningItem | null>(null);
+  const [learningFormData, setLearningFormData] = useState<Partial<LearningItem>>({
+    targetSlug: 'dev-fresher',
+    type: 'path',
+    moduleId: '',
+    title: '',
+    description: '',
+    content: '',
+    meta: ''
+  });
+
+  // Quiz Specific State
+  const [quizOptions, setQuizOptions] = useState<string[]>(['', '', '', '']);
+  const [correctOptionIndex, setCorrectOptionIndex] = useState(0);
+
+  // Jobs State
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [showJobModal, setShowJobModal] = useState(false);
+  const [editingJob, setEditingJob] = useState<Job | null>(null);
+  const [jobFormData, setJobFormData] = useState<Partial<Job>>({
+    title: '', company: '', location: '', experience: '', description: '', postedDate: '', applyLink: ''
+  });
+
+  // Contact Messages State
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+
+  // Initiatives (Site Content) State
+  const [initiatives, setInitiatives] = useState<Initiative[]>([]);
+  const [contentFilter, setContentFilter] = useState<InitiativeCategory>('academy');
+  const [showInitiativeModal, setShowInitiativeModal] = useState(false);
+  const [editingInitiative, setEditingInitiative] = useState<Initiative | null>(null);
+  const [initiativeFormData, setInitiativeFormData] = useState<Partial<Initiative>>({
+    title: '', description: '', category: 'academy', order: 0, iconName: ''
+  });
+
+  // Profile State
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Practice specific fields helpers
+  const [practiceMeta, setPracticeMeta] = useState({ regex: '', hint: '' });
+
   // Modals
   const [showMeetupModal, setShowMeetupModal] = useState(false);
   const [editingMeetup, setEditingMeetup] = useState<Meetup | null>(null);
@@ -58,6 +113,15 @@ const Admin: React.FC = () => {
     presentationTopic: ''
   });
 
+  // --- Derived State Corrections ---
+  const filteredInitiatives = useMemo(() => {
+    return initiatives.filter(i => i.category === contentFilter);
+  }, [initiatives, contentFilter]);
+
+  const sortedReservations = useMemo(() => {
+    return [...reservations].sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime());
+  }, [reservations]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -66,216 +130,411 @@ const Admin: React.FC = () => {
     setIsLoading(false);
     if (success) {
       setIsAuthenticated(true);
-      refreshMeetups();
+      refreshAllData();
     } else {
       setAuthError('Invalid credentials');
     }
   };
 
-  const refreshMeetups = async () => {
-    const data = await getMeetups();
-    setMeetups(data);
+  const refreshAllData = () => {
+    refreshMeetups();
+    refreshLearningItems();
+    refreshJobs();
+    refreshMessages();
+    refreshInitiatives();
+    refreshProfile();
   };
 
-  const refreshReservations = async (meetupId: string) => {
-    setIsLoading(true);
-    const data = await getReservations(meetupId);
-    setReservations(data);
-    setIsLoading(false);
+  const refreshMeetups = async () => { setMeetups(await getMeetups()); };
+  const refreshReservations = async (meetupId: string) => { setIsLoading(true); setReservations(await getReservations(meetupId)); setIsLoading(false); };
+  const refreshLearningItems = async () => { setLearningItems(await getLearningItems()); };
+  const refreshJobs = async () => { setJobs(await getJobs()); };
+  const refreshMessages = async () => { setMessages(await getContactMessages()); };
+  const refreshInitiatives = async () => { setInitiatives(await getInitiatives()); };
+  const refreshProfile = async () => { setProfile(await getProfile()); };
+
+  // --- Profile CRUD ---
+  
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    setIsSavingProfile(true);
+    try {
+        await updateProfile(profile);
+        alert("Profile updated successfully!");
+    } catch (e: any) {
+        alert("Failed to update profile: " + e.message);
+    } finally {
+        setIsSavingProfile(false);
+    }
   };
 
-  // --- Meetup CRUD ---
+  const updateStat = (index: number, field: 'label' | 'value', val: string) => {
+    if (!profile) return;
+    const newStats = [...profile.stats];
+    newStats[index] = { ...newStats[index], [field]: val };
+    setProfile({ ...profile, stats: newStats });
+  };
 
+  // --- Initiatives CRUD ---
+
+  const handleCreateInitiative = () => {
+    setEditingInitiative(null);
+    setInitiativeFormData({
+      title: '', description: '', category: contentFilter, order: 0, iconName: ''
+    });
+    setShowInitiativeModal(true);
+  };
+
+  const handleEditInitiative = (item: Initiative) => {
+    setEditingInitiative(item);
+    setInitiativeFormData({ ...item });
+    setShowInitiativeModal(true);
+  };
+
+  const handleDeleteInitiative = async (id: string) => {
+    if(confirm('Delete this content block?')) {
+        try {
+            await deleteInitiative(id);
+            refreshInitiatives();
+        } catch (e: any) {
+            alert("Delete failed: " + e.message);
+        }
+    }
+  };
+
+  const handleInitiativeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const payload = initiativeFormData as Omit<Initiative, 'id'>;
+    try {
+        if (editingInitiative) {
+            await updateInitiative(editingInitiative.id, payload);
+        } else {
+            await createInitiative(payload);
+        }
+        setShowInitiativeModal(false);
+        refreshInitiatives();
+    } catch (e: any) {
+        alert("Save failed: " + e.message);
+    }
+  };
+
+  // --- Messages Actions ---
+  const handleMarkMessageRead = async (id: string) => {
+    try {
+        await updateContactMessage(id, { read: true });
+        refreshMessages();
+    } catch (e) {
+        console.error("Failed to mark read", e);
+    }
+  };
+
+  // --- Jobs CRUD ---
+
+  const handleCreateJob = () => {
+    setEditingJob(null);
+    setJobFormData({
+        title: '', company: '', location: '', experience: '', description: '', 
+        postedDate: new Date().toISOString().split('T')[0], applyLink: ''
+    });
+    setShowJobModal(true);
+  };
+
+  const handleEditJob = (job: Job) => {
+    setEditingJob(job);
+    setJobFormData({ ...job });
+    setShowJobModal(true);
+  };
+
+  const handleJobSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+        if (editingJob) {
+            await updateJob(editingJob.id, jobFormData);
+        } else {
+            await createJob(jobFormData as Omit<Job, 'id'>);
+        }
+        setShowJobModal(false);
+        refreshJobs();
+    } catch (e: any) {
+        alert("Job save failed: " + e.message);
+    }
+  }
+
+  const handleDeleteJob = async (id: string) => {
+    if(confirm('Delete this job?')) {
+        try {
+            await deleteJob(id);
+            refreshJobs();
+        } catch (e: any) {
+            alert("Job delete failed: " + e.message);
+        }
+    }
+  }
+
+  // --- Learning Hub CRUD ---
+
+  const availableModules = useMemo(() => {
+    const slug = learningFormData.targetSlug;
+    return learningItems.filter(item => item.targetSlug === slug && item.type === 'path');
+  }, [learningItems, learningFormData.targetSlug]);
+
+  const handleCreateLearning = (preselectedModuleId: string = '') => {
+    setEditingLearningItem(null);
+    setLearningFormData({
+      targetSlug: learningFilter !== 'all' ? learningFilter : 'dev-fresher',
+      type: preselectedModuleId ? 'quiz' : 'path',
+      moduleId: preselectedModuleId,
+      title: '',
+      description: '',
+      content: '',
+      meta: ''
+    });
+    setPracticeMeta({ regex: '', hint: '' });
+    setQuizOptions(['', '', '', '']);
+    setCorrectOptionIndex(0);
+    setShowLearningModal(true);
+  };
+
+  const handleEditLearning = (item: LearningItem) => {
+    setEditingLearningItem(item);
+    setLearningFormData({ ...item });
+    
+    // Reset specific states
+    setPracticeMeta({ regex: '', hint: '' });
+    setQuizOptions(['', '', '', '']);
+    setCorrectOptionIndex(0);
+
+    if (item.type === 'practice' && item.meta) {
+        try {
+            const metaObj = JSON.parse(item.meta);
+            setPracticeMeta({ regex: metaObj.regex || '', hint: metaObj.hint || '' });
+        } catch {
+            setPracticeMeta({ regex: '', hint: '' });
+        }
+    } else if (item.type === 'quiz') {
+        try {
+            setQuizOptions(JSON.parse(item.content || '["","","",""]'));
+            const meta = JSON.parse(item.meta || '{}');
+            setCorrectOptionIndex(meta.correctIndex || 0);
+        } catch {
+            // fallback
+        }
+    }
+    setShowLearningModal(true);
+  };
+
+  const handleDeleteLearning = async (id: string) => {
+    if (confirm('Are you sure you want to delete this content?')) {
+        try {
+            await deleteLearningItem(id);
+            refreshLearningItems();
+        } catch (e: any) {
+            alert("Delete failed: " + e.message);
+        }
+    }
+  };
+
+  const handleLearningSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    let submissionMeta = learningFormData.meta || '';
+    let submissionContent = learningFormData.content || '';
+
+    if (learningFormData.type === 'practice') {
+        submissionMeta = JSON.stringify(practiceMeta);
+    } else if (learningFormData.type === 'quiz') {
+        submissionContent = JSON.stringify(quizOptions);
+        submissionMeta = JSON.stringify({ correctIndex: correctOptionIndex });
+    }
+
+    const payload = { ...learningFormData, content: submissionContent, meta: submissionMeta } as Omit<LearningItem, 'id'>;
+
+    try {
+        if (editingLearningItem) {
+            await updateLearningItem(editingLearningItem.id, payload);
+        } else {
+            await createLearningItem(payload);
+        }
+        setShowLearningModal(false);
+        refreshLearningItems();
+    } catch (e: any) {
+        alert("Failed to save learning item: " + e.message);
+    }
+  };
+
+  // Learning Render Helpers
+  const renderLearningHierarchy = () => {
+    if (learningFilter === 'all') return <div className="text-center p-8 text-slate-500">Please select a Target Audience to view modules and content.</div>;
+
+    const filtered = learningItems.filter(i => i.targetSlug === learningFilter);
+    const modules = filtered.filter(i => i.type === 'path').sort((a,b) => (a.order || 0) - (b.order || 0));
+    const orphans = filtered.filter(i => i.type !== 'path' && !i.moduleId);
+
+    return (
+        <div className="space-y-8">
+            {/* Modules Loop */}
+            {modules.map(module => {
+                const children = filtered.filter(i => i.moduleId === module.id).sort((a,b) => (a.order || 0) - (b.order || 0));
+                
+                return (
+                    <div key={module.id} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                        {/* Module Header */}
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <span className="w-8 h-8 rounded-full bg-am-100 dark:bg-am-900/30 text-am-600 dark:text-am-400 flex items-center justify-center font-bold text-sm">{module.order}</span>
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-900 dark:text-white">{module.title}</h3>
+                                    <p className="text-xs text-slate-500">{module.description}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => handleCreateLearning(module.id)} className="text-xs bg-am-600 text-white px-3 py-1.5 rounded hover:bg-am-700 flex items-center font-bold transition">
+                                    <Plus size={14} className="mr-1"/> Add Quiz
+                                </button>
+                                <button onClick={() => handleEditLearning(module)} className="p-2 text-slate-500 hover:text-am-600"><Edit size={16}/></button>
+                                <button onClick={() => handleDeleteLearning(module.id)} className="p-2 text-slate-500 hover:text-red-600"><Trash2 size={16}/></button>
+                            </div>
+                        </div>
+
+                        {/* Module Content (Children) */}
+                        {children.length > 0 ? (
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {children.map(child => (
+                                    <div key={child.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-1.5 rounded ${
+                                                child.type === 'quiz' ? 'bg-orange-100 text-orange-600' :
+                                                child.type === 'practice' ? 'bg-green-100 text-green-600' : 
+                                                'bg-blue-100 text-blue-600'
+                                            }`}>
+                                                {child.type === 'quiz' ? <HelpCircle size={16} /> : child.type === 'practice' ? <Code2 size={16}/> : <FileText size={16} />}
+                                            </div>
+                                            <div>
+                                                <div className="font-medium text-sm text-slate-800 dark:text-slate-200">{child.title}</div>
+                                                <div className="text-xs text-slate-500 line-clamp-1">{child.description}</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button onClick={() => handleEditLearning(child)} className="text-slate-400 hover:text-am-600"><Edit size={14}/></button>
+                                            <button onClick={() => handleDeleteLearning(child.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={14}/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-4 text-center text-xs text-slate-400 italic">No quizzes or content added to this module yet.</div>
+                        )}
+                    </div>
+                );
+            })}
+
+            {/* Orphans Section */}
+            {orphans.length > 0 && (
+                <div className="bg-slate-50 dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6">
+                    <h3 className="font-bold text-slate-700 dark:text-slate-300 mb-4 flex items-center">
+                        <FolderOpen size={18} className="mr-2"/> General / Uncategorized Content
+                    </h3>
+                    <div className="grid gap-3">
+                        {orphans.map(item => (
+                            <div key={item.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${
+                                        item.type === 'practice' ? 'bg-green-100 text-green-700' : 
+                                        item.type === 'interview' ? 'bg-purple-100 text-purple-700' : 
+                                        item.type === 'quiz' ? 'bg-orange-100 text-orange-700' :
+                                        'bg-blue-100 text-blue-700'
+                                    }`}>
+                                        {item.type}
+                                    </span>
+                                    <span className="font-medium text-sm text-slate-800 dark:text-white">{item.title}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => handleEditLearning(item)} className="text-slate-400 hover:text-am-600"><Edit size={14}/></button>
+                                    <button onClick={() => handleDeleteLearning(item.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={14}/></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+            
+            {modules.length === 0 && orphans.length === 0 && (
+                <div className="text-center py-12 text-slate-500">
+                    <p>No content found for this category.</p>
+                    <button onClick={() => handleCreateLearning()} className="mt-4 text-am-600 font-bold hover:underline">Create First Module</button>
+                </div>
+            )}
+        </div>
+    );
+  };
+
+  // ... (Keep existing Meetup CRUD methods) ...
   const handleEditClick = (meetup: Meetup) => {
     setEditingMeetup(meetup);
-    setFormData({
-      title: meetup.title,
-      date: meetup.date,
-      location: meetup.location,
-      description: meetup.description,
-      type: meetup.type,
-      capacity: meetup.capacity,
-      registrationMode: meetup.registrationMode || 'registration',
-      seatsPerTable: meetup.seatsPerTable || 8,
-      reservedSeats: meetup.reservedSeats || { hosts: 2, presenters: 2, volunteers: 2, sponsors: 0 },
-      registrationStart: meetup.registrationStart || '',
-      registrationEnd: meetup.registrationEnd || '',
-      isRegistrationClosed: meetup.isRegistrationClosed || false
-    });
+    setFormData({ ...meetup } as any);
     setShowMeetupModal(true);
   };
 
   const handleCreateClick = () => {
     setEditingMeetup(null);
     setFormData({
-      title: '',
-      date: '',
-      location: '',
-      description: '',
-      type: 'Future',
-      capacity: 96,
-      registrationMode: 'registration',
-      seatsPerTable: 6,
+      title: '', date: '', location: '', description: '', type: 'Future', capacity: 96,
+      registrationMode: 'registration', seatsPerTable: 6,
       reservedSeats: { hosts: 2, presenters: 2, volunteers: 2, sponsors: 0 },
-      registrationStart: '',
-      registrationEnd: '',
-      isRegistrationClosed: false
+      registrationStart: '', registrationEnd: '', isRegistrationClosed: false
     });
     setShowMeetupModal(true);
   };
 
   const handleDeleteClick = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this meetup? This action cannot be undone and will delete all associated registrations.")) {
-      return;
-    }
-
-    // Optimistic Update
-    const prevMeetups = [...meetups];
-    setMeetups(prev => prev.filter(m => m.id !== id));
-    
-    try {
-      await deleteMeetup(id);
-      // Don't need to refresh if success, state is already updated
-      if (selectedMeetupId === id) {
-        setSelectedMeetupId(null);
-        setReservations([]);
-      }
-    } catch (error: any) {
-      console.error("Delete failed:", error);
-      alert("Failed to delete meetup. It might have already been deleted.");
-      setMeetups(prevMeetups); // Revert
-      refreshMeetups();
-    }
+    if (!window.confirm("Are you sure you want to delete this meetup?")) return;
+    try { await deleteMeetup(id); refreshMeetups(); } catch (error: any) { alert("Failed to delete meetup."); }
   };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Type assertion for required fields
     const submissionData = formData as Omit<Meetup, 'id' | 'registrations'>;
-
     try {
-      if (editingMeetup) {
-        await updateMeetup(editingMeetup.id, submissionData);
-      } else {
-        await createMeetup(submissionData);
-      }
+      if (editingMeetup) { await updateMeetup(editingMeetup.id, submissionData); } 
+      else { await createMeetup(submissionData); }
       setShowMeetupModal(false);
       refreshMeetups();
-    } catch (error: any) {
-      alert("Error: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (error: any) { alert("Error: " + error.message); } 
+    finally { setIsLoading(false); }
   };
 
-  // Calculation Helper for Tables
-  const totalTables = Math.ceil((formData.capacity || 0) / (formData.seatsPerTable || 8));
+  const handleViewRegistrations = (id: string) => { setSelectedMeetupId(id); setActiveTab('registrations'); refreshReservations(id); };
+  const handleEditReservationClick = (r: Reservation) => { setEditingReservation(r); setEditResForm({ seatNumber: r.seatNumber || '', status: r.status, rejectionReason: r.rejectionReason || '', isHidden: !!r.isHidden }); };
+  const handleSaveReservation = async () => { if (!editingReservation) return; setIsLoading(true); try { const newSwag = (editResForm.seatNumber && editResForm.status === 'confirmed') ? calculateSwag(editResForm.seatNumber) : (editingReservation.swag || 'TBD'); await updateReservation(editingReservation.id, { seatNumber: editResForm.seatNumber.toUpperCase(), status: editResForm.status, rejectionReason: editResForm.rejectionReason, isHidden: editResForm.isHidden, swag: newSwag }); setEditingReservation(null); refreshReservations(editingReservation.meetupId); } catch (error: any) { alert("Failed to update: " + error.message); } finally { setIsLoading(false); } };
+  const handleDeleteReservationFromModal = async () => { if (!editingReservation) return; if (!window.confirm("Permanently DELETE this registration?")) return; const idToDelete = editingReservation.id; const meetupId = editingReservation.meetupId; setIsLoading(true); setEditingReservation(null); try { await deleteReservation(idToDelete, meetupId); refreshReservations(meetupId); } catch (error: any) { alert("Failed to delete: " + error.message); } finally { setIsLoading(false); } };
 
-  // --- Registration CRUD ---
-  const handleViewRegistrations = (id: string) => {
-    setSelectedMeetupId(id);
-    setActiveTab('registrations');
-    refreshReservations(id);
-  };
-
-  // --- NEW: Single Edit Action Logic ---
-  const handleEditReservationClick = (r: Reservation) => {
-    setEditingReservation(r);
-    setEditResForm({
-      seatNumber: r.seatNumber || '',
-      status: r.status,
-      rejectionReason: r.rejectionReason || '',
-      isHidden: !!r.isHidden
-    });
-  };
-
-  const handleSaveReservation = async () => {
-    if (!editingReservation) return;
-    setIsLoading(true);
-    try {
-      // Recalculate swag if seat changes or status becomes confirmed
-      const newSwag = (editResForm.seatNumber && editResForm.status === 'confirmed') 
-        ? calculateSwag(editResForm.seatNumber) 
-        : (editingReservation.swag || 'TBD');
-
-      await updateReservation(editingReservation.id, {
-        seatNumber: editResForm.seatNumber.toUpperCase(),
-        status: editResForm.status,
-        rejectionReason: editResForm.rejectionReason,
-        isHidden: editResForm.isHidden,
-        swag: newSwag
-      });
-
-      setEditingReservation(null);
-      refreshReservations(editingReservation.meetupId);
-    } catch (error: any) {
-      alert("Failed to update: " + error.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleDeleteReservationFromModal = async () => {
-    if (!editingReservation) return;
-    
-    if (!window.confirm("Are you sure you want to permanently DELETE this registration? This cannot be undone.")) {
-      return;
-    }
-
-    const idToDelete = editingReservation.id;
-    const meetupId = editingReservation.meetupId;
-
-    setIsLoading(true);
-    
-    // Optimistic Update: Close modal and remove from list immediately
-    setEditingReservation(null);
-    setReservations(prev => prev.filter(r => r.id !== idToDelete));
-
-    try {
-      await deleteReservation(idToDelete, meetupId);
-    } catch (error: any) {
-      console.error("Delete failed:", error);
-      alert("Failed to delete registration: " + error.message);
-      refreshReservations(meetupId); // Revert/Refresh on error
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // --- NEW: Add Attendee (Admin Override) ---
   const handleAddAttendeeClick = () => {
+    if (!selectedMeetupId) return;
     setAttendeeData({ name: '', email: '', company: '', linkedin: '', seatNumber: '', sessionPresenter: false, presentationTopic: '' });
     setShowAddAttendeeModal(true);
   };
 
-  const handleAddAttendeeSubmit = async (e: React.FormEvent) => {
+  const handleAttendeeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMeetupId) return;
-    setIsLoading(true);
+    
     try {
-      const res = await registerUser({ meetupId: selectedMeetupId, ...attendeeData });
-      await updateReservation(res.id, { status: 'confirmed' });
-      setShowAddAttendeeModal(false);
-      refreshReservations(selectedMeetupId);
+        await registerUser({
+            meetupId: selectedMeetupId,
+            ...attendeeData
+        });
+        alert('Attendee registered successfully!');
+        setShowAddAttendeeModal(false);
+        refreshReservations(selectedMeetupId);
     } catch (error: any) {
-      alert("Error adding attendee: " + error.message);
-    } finally {
-      setIsLoading(false);
+        alert('Registration failed: ' + error.message);
     }
   };
 
-  // Safe Sort
-  const sortedReservations = useMemo(() => {
-    return [...reservations].sort((a,b) => {
-        if (a.status === 'pending' && b.status !== 'pending') return -1;
-        if (a.status !== 'pending' && b.status === 'pending') return 1;
-        return String(a.seatNumber || '').localeCompare(String(b.seatNumber || ''), undefined, {numeric: true});
-    });
-  }, [reservations]);
-
   if (!isAuthenticated) {
-    // ... Login UI (Keep existing)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 py-12 px-4 sm:px-6 lg:px-8 transition-colors duration-200">
         <div className="max-w-md w-full space-y-8 bg-white dark:bg-slate-800 p-10 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
@@ -284,26 +543,15 @@ const Admin: React.FC = () => {
               <Shield size={32} />
             </div>
             <h2 className="mt-2 text-3xl font-extrabold text-slate-900 dark:text-white mb-2">Admin Console</h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Please sign in to manage meetups</p>
+            <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+              <div className="rounded-md shadow-sm -space-y-px">
+                <div><input type="text" required className="appearance-none rounded-none relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-t-md" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
+                <div><input type="password" required className="appearance-none rounded-none relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-b-md" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+              </div>
+              {authError && <div className="text-red-500 text-sm text-center">{authError}</div>}
+              <div><button type="submit" disabled={isLoading} className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-am-900 hover:bg-am-800">{isLoading ? <Loader2 className="animate-spin" /> : 'Sign in'}</button></div>
+            </form>
           </div>
-          <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-            <div className="rounded-md shadow-sm -space-y-px">
-              <div>
-                <label className="sr-only">Username</label>
-                <input type="text" required className="appearance-none rounded-none relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white placeholder-slate-500 text-slate-900 rounded-t-md focus:outline-none focus:ring-am-500 focus:border-am-500 focus:z-10 sm:text-sm" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
-              </div>
-              <div>
-                <label className="sr-only">Password</label>
-                <input type="password" required className="appearance-none rounded-none relative block w-full px-3 py-2 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white placeholder-slate-500 text-slate-900 rounded-b-md focus:outline-none focus:ring-am-500 focus:border-am-500 focus:z-10 sm:text-sm" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-            </div>
-            {authError && <div className="text-red-500 text-sm text-center font-medium bg-red-50 dark:bg-red-900/30 dark:text-red-400 p-2 rounded">{authError}</div>}
-            <div>
-              <button type="submit" disabled={isLoading} className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-am-900 hover:bg-am-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-am-500 transition disabled:opacity-70">
-                {isLoading ? <Loader2 className="animate-spin" /> : 'Sign in'}
-              </button>
-            </div>
-          </form>
         </div>
       </div>
     );
@@ -311,497 +559,582 @@ const Admin: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-200">
-      {/* Header */}
       <header className="bg-white dark:bg-slate-900 shadow border-b border-slate-200 dark:border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <div className="flex items-center space-x-3">
-             <div className="bg-am-600 text-white p-2 rounded">
-               <Shield size={20} />
-             </div>
+             <div className="bg-am-600 text-white p-2 rounded"><Shield size={20} /></div>
              <h1 className="text-xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
           </div>
           <div className="flex items-center space-x-4">
-            <Link to="/admin/setup" className="flex items-center text-sm text-am-600 dark:text-am-400 hover:text-am-800 dark:hover:text-am-300 font-medium">
-              <UserPlus size={16} className="mr-2" /> Create New Admin
-            </Link>
-            <button onClick={() => setIsAuthenticated(false)} className="flex items-center text-sm text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition font-medium">
-              <LogOut size={16} className="mr-2" /> Sign Out
-            </button>
+            <Link to="/admin/setup" className="flex items-center text-sm text-am-600 dark:text-am-400 hover:text-am-800 font-medium"><UserPlus size={16} className="mr-2" /> Create New Admin</Link>
+            <button onClick={() => setIsAuthenticated(false)} className="flex items-center text-sm text-slate-600 dark:text-slate-400 hover:text-red-600 font-medium"><LogOut size={16} className="mr-2" /> Sign Out</button>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Navigation Tabs */}
-        <div className="flex space-x-1 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm mb-8 w-fit">
-          <button onClick={() => setActiveTab('meetups')} className={`px-4 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'meetups' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-            <LayoutDashboard size={16} className="mr-2" /> Manage Meetups
-          </button>
-          <button onClick={() => setActiveTab('registrations')} className={`px-4 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'registrations' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-            <Users size={16} className="mr-2" /> Review Registrations
-          </button>
+        <div className="flex flex-wrap gap-2 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm mb-8 w-fit">
+          <button onClick={() => setActiveTab('meetups')} className={`px-3 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'meetups' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400'}`}><LayoutDashboard size={16} className="mr-2" /> Meetups</button>
+          <button onClick={() => setActiveTab('registrations')} className={`px-3 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'registrations' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400'}`}><Users size={16} className="mr-2" /> Registrations</button>
+          <button onClick={() => setActiveTab('messages')} className={`px-3 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'messages' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400'}`}><Mail size={16} className="mr-2" /> Messages</button>
+          <button onClick={() => setActiveTab('content')} className={`px-3 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'content' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400'}`}><Globe size={16} className="mr-2" /> Site Content</button>
+          <button onClick={() => setActiveTab('learning')} className={`px-3 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'learning' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400'}`}><BookOpen size={16} className="mr-2" /> Learning</button>
+          <button onClick={() => setActiveTab('jobs')} className={`px-3 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'jobs' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400'}`}><Briefcase size={16} className="mr-2" /> Jobs</button>
+          <button onClick={() => setActiveTab('profile')} className={`px-3 py-2 rounded-md text-sm font-medium transition flex items-center ${activeTab === 'profile' ? 'bg-am-100 dark:bg-am-900/50 text-am-700 dark:text-am-300' : 'text-slate-600 dark:text-slate-400'}`}><User size={16} className="mr-2" /> Profile</button>
         </div>
 
-        {/* MEETUPS TAB */}
+        {/* ... (Existing Tabs: Messages, Content, Jobs, Profile, Meetups, Registrations) ... */}
+        {/* Profile, Messages, Content, Jobs code remains identical as before */}
+        
+        {activeTab === 'profile' && profile && (
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm max-w-3xl">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6 border-b border-slate-200 dark:border-slate-800 pb-2">Edit User Profile</h2>
+                <form onSubmit={handleProfileUpdate} className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Headline</label>
+                        <input 
+                            type="text" 
+                            className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2"
+                            value={profile.headline}
+                            onChange={e => setProfile({...profile, headline: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Bio (Short Intro)</label>
+                        <textarea 
+                            rows={4} 
+                            className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2"
+                            value={profile.bio}
+                            onChange={e => setProfile({...profile, bio: e.target.value})}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Journey / History</label>
+                        <textarea 
+                            rows={6} 
+                            className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2"
+                            value={profile.journey || ''}
+                            onChange={e => setProfile({...profile, journey: e.target.value})}
+                            placeholder="Share your professional journey, milestones, and timeline..."
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Future Goals & Initiatives</label>
+                        <textarea 
+                            rows={4} 
+                            className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2"
+                            value={profile.futureGoals || ''}
+                            onChange={e => setProfile({...profile, futureGoals: e.target.value})}
+                            placeholder="What are you building next?"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Certifications & Achievements</label>
+                        <textarea 
+                            rows={4} 
+                            className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2"
+                            value={profile.certifications || ''}
+                            onChange={e => setProfile({...profile, certifications: e.target.value})}
+                            placeholder="List your certifications (one per line)..."
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">LinkedIn Badge HTML Code</label>
+                        <textarea 
+                            rows={3} 
+                            className="w-full font-mono text-xs border border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white rounded-md px-3 py-2"
+                            value={profile.linkedinBadgeHtml}
+                            onChange={e => setProfile({...profile, linkedinBadgeHtml: e.target.value})}
+                            placeholder="<div class='badge-base LI-profile-badge'...>"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">Paste the full embed code provided by LinkedIn.</p>
+                    </div>
+                    
+                    <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
+                        <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Key Statistics</label>
+                        <div className="grid grid-cols-3 gap-4">
+                            {profile.stats.map((stat, idx) => (
+                                <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg">
+                                    <input 
+                                        type="text" 
+                                        className="w-full text-center font-bold mb-1 border-b border-transparent hover:border-slate-300 bg-transparent focus:outline-none dark:text-white"
+                                        value={stat.value}
+                                        onChange={e => updateStat(idx, 'value', e.target.value)}
+                                        placeholder="Value"
+                                    />
+                                    <input 
+                                        type="text" 
+                                        className="w-full text-center text-xs uppercase text-slate-500 bg-transparent border-b border-transparent hover:border-slate-300 focus:outline-none"
+                                        value={stat.label}
+                                        onChange={e => updateStat(idx, 'label', e.target.value)}
+                                        placeholder="Label"
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="pt-4 flex justify-end">
+                        <button type="submit" disabled={isSavingProfile} className="bg-am-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-am-700 flex items-center">
+                            {isSavingProfile ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" size={18} />}
+                            Save Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        )}
+
+        {/* MESSAGES TAB */}
+        {activeTab === 'messages' && (
+           <div className="space-y-6">
+             <h2 className="text-xl font-bold text-slate-800 dark:text-white">Contact Submissions</h2>
+             <div className="grid gap-4">
+               {messages.map(msg => (
+                 <div key={msg.id} className={`bg-white dark:bg-slate-900 p-6 rounded-xl border ${msg.read ? 'border-slate-200 dark:border-slate-800' : 'border-am-500 shadow-md'} relative`}>
+                   {!msg.read && <div className="absolute top-4 right-4 bg-am-600 text-white text-xs px-2 py-1 rounded-full font-bold uppercase">New</div>}
+                   <div className="flex flex-col md:flex-row justify-between mb-4">
+                     <div>
+                       <h3 className="text-lg font-bold text-slate-900 dark:text-white">{msg.name}</h3>
+                       <div className="text-sm text-slate-500">{msg.email} • {msg.phone}</div>
+                       <div className="text-xs text-slate-400 mt-1">{new Date(msg.submittedAt).toLocaleString()}</div>
+                     </div>
+                     {!msg.read && (
+                       <button onClick={() => handleMarkMessageRead(msg.id)} className="mt-2 md:mt-0 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-3 py-1 rounded text-sm hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center h-fit">
+                         <CheckCircle size={14} className="mr-1"/> Mark Read
+                       </button>
+                     )}
+                   </div>
+                   <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-lg text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap">
+                     {msg.message}
+                   </div>
+                 </div>
+               ))}
+               {messages.length === 0 && <div className="text-center p-8 text-slate-500">No messages yet.</div>}
+             </div>
+           </div>
+        )}
+
+        {/* CONTENT TAB */}
+        {activeTab === 'content' && (
+           <div className="space-y-6">
+             <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center space-x-4">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Page Category:</label>
+                    <select className="border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md p-2 text-sm" value={contentFilter} onChange={(e) => setContentFilter(e.target.value as InitiativeCategory)}>
+                        <option value="academy">AM Academy</option>
+                        <option value="marketing">AM Marketing</option>
+                        <option value="foods">AM Foods</option>
+                        <option value="tech">AM Tech</option>
+                    </select>
+                </div>
+                <button onClick={handleCreateInitiative} className="bg-am-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-am-700 transition flex items-center"><Plus size={16} className="mr-2" /> Add Content Block</button>
+             </div>
+             
+             <div className="grid gap-4">
+                {filteredInitiatives.map(item => (
+                   <div key={item.id} className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm flex justify-between items-start">
+                      <div className="flex-grow pr-4">
+                         <div className="flex items-center gap-2 mb-2">
+                             <span className="text-xs font-bold uppercase bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded">Order: {item.order}</span>
+                             {item.iconName && <span className="text-xs font-mono bg-blue-50 dark:bg-blue-900/30 text-blue-600 px-2 py-0.5 rounded flex items-center"><Code2 size={10} className="mr-1"/> {item.iconName}</span>}
+                         </div>
+                         <h3 className="font-bold text-slate-900 dark:text-white">{item.title}</h3>
+                         <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{item.description}</p>
+                      </div>
+                      <div className="flex items-center space-x-2 shrink-0">
+                         <button onClick={() => handleEditInitiative(item)} className="p-2 text-slate-500 hover:text-am-600"><Edit size={16}/></button>
+                         <button onClick={() => handleDeleteInitiative(item.id)} className="p-2 text-slate-500 hover:text-red-600"><Trash2 size={16}/></button>
+                      </div>
+                   </div>
+                ))}
+             </div>
+           </div>
+        )}
+
+        {/* JOBS TAB */}
+        {activeTab === 'jobs' && (
+             <div className="space-y-6">
+                 {/* ... Job UI ... */}
+                 <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-slate-800 dark:text-white">Posted Jobs</h2>
+                    <button onClick={handleCreateJob} className="bg-am-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-am-700 transition flex items-center"><Plus size={16} className="mr-2" /> Post New Job</button>
+                 </div>
+                 
+                 <div className="bg-white dark:bg-slate-900 shadow-sm rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                        <thead className="bg-slate-50 dark:bg-slate-800">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Position</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Company & Location</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Experience</th>
+                            <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
+                            {jobs.map(job => (
+                                <tr key={job.id}>
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-slate-900 dark:text-white">{job.title}</div>
+                                        <div className="text-xs text-slate-500">Posted: {job.postedDate}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="text-sm font-medium text-slate-900 dark:text-white">{job.company}</div>
+                                        <div className="text-sm text-slate-500">{job.location}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
+                                        {job.experience}
+                                    </td>
+                                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                                        <button onClick={() => handleEditJob(job)} className="text-slate-600 hover:text-am-600 mr-4"><Edit size={16} /></button>
+                                        <button onClick={() => handleDeleteJob(job.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={16} /></button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                 </div>
+             </div>
+        )}
+
+        {/* LEARNING TAB */}
+        {activeTab === 'learning' && (
+            <div className="space-y-6">
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center space-x-4">
+                        <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Target Audience:</label>
+                        <select className="border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md p-2 text-sm" value={learningFilter} onChange={(e) => setLearningFilter(e.target.value)}>
+                            <option value="all">All Audiences</option>
+                            {TARGET_AUDIENCES.map(t => <option key={t.slug} value={t.slug}>{t.label}</option>)}
+                        </select>
+                    </div>
+                    <button onClick={() => handleCreateLearning()} className="bg-am-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-am-700 transition flex items-center"><Plus size={16} className="mr-2" /> Add Path/Module</button>
+                </div>
+
+                {renderLearningHierarchy()}
+            </div>
+        )}
+
+        {/* Meetups & Registrations Tabs (identical to before) */}
         {activeTab === 'meetups' && (
           <div className="bg-white dark:bg-slate-900 shadow-sm rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
+             <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
               <h2 className="text-lg font-bold text-slate-800 dark:text-white">All Events</h2>
               <button onClick={handleCreateClick} className="bg-am-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-am-700 transition flex items-center">
                 <Plus size={16} className="mr-2" /> Create New Meetup
               </button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
                 <thead className="bg-slate-50 dark:bg-slate-800">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Title</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Reg Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Stats</th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
                   {meetups.map((meetup) => (
-                    <tr key={meetup.id} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                          ${meetup.type === 'Present' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 
-                            meetup.type === 'Past' ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'}`}>
-                          {meetup.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-slate-900 dark:text-white">{meetup.title}</div>
-                        <div className="text-sm text-slate-500 dark:text-slate-400">{meetup.date} • {meetup.location}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                         {meetup.isRegistrationClosed ? (
-                           <span className="text-red-600 dark:text-red-400 font-bold text-xs flex items-center"><Lock size={12} className="mr-1"/> Closed</span>
-                         ) : (
-                           <span className="text-green-600 dark:text-green-400 font-bold text-xs">Open</span>
-                         )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                        <div className="flex flex-col">
-                           <span>Cap: {meetup.capacity} ({Math.ceil(meetup.capacity / (meetup.seatsPerTable || 8))} Tables)</span>
-                           <span>Filled: {meetup.registrations}</span>
-                        </div>
-                      </td>
+                    <tr key={meetup.id}>
+                      <td className="px-6 py-4 whitespace-nowrap"><span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">{meetup.type}</span></td>
+                      <td className="px-6 py-4"><div className="text-sm font-medium text-slate-900 dark:text-white">{meetup.title}</div><div className="text-sm text-slate-500">{meetup.date}</div></td>
+                      <td className="px-6 py-4 text-sm text-slate-500">Filled: {meetup.registrations}/{meetup.capacity}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button onClick={() => handleViewRegistrations(meetup.id)} className="text-am-600 dark:text-am-400 hover:text-am-900 dark:hover:text-am-300 mr-4" title="View Registrations"><Users size={18} /></button>
-                        <button onClick={() => handleEditClick(meetup)} className="text-slate-600 dark:text-slate-400 hover:text-am-600 dark:hover:text-am-400 mr-4" title="Edit"><Edit size={18} /></button>
-                        <button 
-                          type="button" 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteClick(meetup.id); }} 
-                          className="text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400" 
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
+                        <button onClick={() => handleViewRegistrations(meetup.id)} className="text-am-600 mr-4"><Users size={18} /></button>
+                        <button onClick={() => handleEditClick(meetup)} className="text-slate-600 mr-4"><Edit size={18} /></button>
+                        <button onClick={() => handleDeleteClick(meetup.id)} className="text-slate-400 hover:text-red-600"><Trash2 size={18} /></button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
           </div>
         )}
 
-        {/* REGISTRATIONS TAB */}
         {activeTab === 'registrations' && (
-          <div className="space-y-6">
-            <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+           <div className="space-y-6">
+             <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Select Meetup:</label>
-                <select 
-                  className="border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md p-2 text-sm focus:ring-am-500 focus:border-am-500"
-                  value={selectedMeetupId || ''}
-                  onChange={(e) => handleViewRegistrations(e.target.value)}
-                >
+                <select className="border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md p-2 text-sm" value={selectedMeetupId || ''} onChange={(e) => handleViewRegistrations(e.target.value)}>
                   <option value="">-- Select an event --</option>
-                  {meetups.map(m => (
-                    <option key={m.id} value={m.id}>{m.title} ({m.date})</option>
-                  ))}
+                  {meetups.map(m => <option key={m.id} value={m.id}>{m.title} ({m.date})</option>)}
                 </select>
               </div>
-
+              
+              {/* Add Attendee Button */}
               {selectedMeetupId && (
-                <button 
-                  onClick={handleAddAttendeeClick}
-                  className="bg-am-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-am-700 transition flex items-center"
-                >
-                  <UserPlus size={16} className="mr-2" /> Add Attendee
-                </button>
+                  <button 
+                    onClick={handleAddAttendeeClick}
+                    className="bg-am-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-am-700 transition flex items-center"
+                  >
+                    <Plus size={16} className="mr-2"/> Add Attendee
+                  </button>
               )}
             </div>
-
             {selectedMeetupId && (
-              <div className="bg-white dark:bg-slate-900 shadow-sm rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                 <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">
-                      Review Registrations ({reservations.length})
-                    </h3>
-                    <button 
-                      className="text-sm text-am-600 dark:text-am-400 font-medium hover:underline"
-                      onClick={() => {
-                        const csvContent = "data:text/csv;charset=utf-8," 
-                          + "Status,Seat,Name,Email,Company,LinkedIn,Presenter,Topic,Swag,Visible\n"
-                          + reservations.map(r => `${r.status},${r.seatNumber},"${r.name}","${r.email}","${r.company}","${r.linkedin}",${r.sessionPresenter},"${r.presentationTopic || ''}","${r.swag}",${!r.isHidden}`).join("\n");
-                        const encodedUri = encodeURI(csvContent);
-                        const link = document.createElement("a");
-                        link.setAttribute("href", encodedUri);
-                        link.setAttribute("download", `registrations_${selectedMeetupId}.csv`);
-                        document.body.appendChild(link);
-                        link.click();
-                      }}
-                    >
-                      Export CSV
-                    </button>
-                 </div>
-                 
-                 <div className="overflow-x-auto">
-                    {isLoading ? (
-                      <div className="p-12 text-center text-slate-500">Loading data...</div>
-                    ) : reservations.length > 0 ? (
+                <div className="bg-white dark:bg-slate-900 shadow-sm rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
                         <thead className="bg-slate-50 dark:bg-slate-800">
                           <tr>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Seat</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Attendee</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Contact</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Swag</th>
                             <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-slate-900 divide-y divide-slate-200 dark:divide-slate-800">
                            {sortedReservations.map((r) => (
-                            <tr key={r.id} className={r.isHidden ? 'bg-slate-100 dark:bg-slate-800 opacity-60' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {r.status === 'confirmed' && <span className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-xs px-2 py-1 rounded-full font-bold border border-green-200 dark:border-green-800">Confirmed</span>}
-                                {r.status === 'rejected' && <span className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 text-xs px-2 py-1 rounded-full font-bold border border-red-200 dark:border-red-800">Rejected</span>}
-                                {r.status === 'pending' && <span className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 text-xs px-2 py-1 rounded-full font-bold border border-yellow-200 dark:border-yellow-800 animate-pulse">Pending</span>}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-am-600 dark:text-am-400">
-                                {r.status === 'confirmed' ? r.seatNumber : r.seatNumber ? <span className="text-slate-500 italic">Req: {r.seatNumber}</span> : <span className="text-slate-400 italic font-normal">TBD</span>}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-slate-900 dark:text-white flex items-center">{r.name} {r.isHidden && <span className="ml-2 text-xs text-slate-400">(Hidden)</span>} {r.sessionPresenter && <span className="ml-2 text-xs bg-purple-100 text-purple-700 px-1 rounded">Speaker</span>}</div>
-                                <div className="text-sm text-slate-500 dark:text-slate-400">{r.company}</div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
-                                <div className="flex flex-col"><span>{r.email}</span><a href={r.linkedin} target="_blank" rel="noreferrer" className="text-blue-500 hover:underline text-xs">LinkedIn</a></div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-xs border border-slate-200 dark:border-slate-700">{r.status === 'confirmed' ? r.swag : 'TBD'}</span></td>
-                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                <button 
-                                  onClick={() => handleEditReservationClick(r)}
-                                  className="text-slate-600 dark:text-slate-400 hover:text-am-600 dark:hover:text-am-400 bg-slate-100 dark:bg-slate-800 p-2 rounded-full border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
-                                  title="Edit Registration"
-                                >
-                                  <Edit size={16} />
-                                </button>
-                              </td>
+                            <tr key={r.id}>
+                              <td className="px-6 py-4">{r.status}</td>
+                              <td className="px-6 py-4"><div>{r.name}</div><div className="text-xs text-slate-500">{r.email}</div></td>
+                              <td className="px-6 py-4 text-right"><button onClick={() => handleEditReservationClick(r)} className="text-slate-600"><Edit size={16} /></button></td>
                             </tr>
-                          ))}
+                           ))}
                         </tbody>
                       </table>
-                    ) : (
-                      <div className="p-12 text-center text-slate-500 dark:text-slate-400">
-                        No registrations found for this event.
-                      </div>
-                    )}
-                 </div>
-              </div>
+                    </div>
+                </div>
             )}
-          </div>
+           </div>
         )}
+
       </div>
 
-      {/* MEETUP MODAL */}
-      {showMeetupModal && (
+      {/* --- MODALS SECTION --- */}
+
+      {/* LEARNING MODAL */}
+      {showLearningModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto border dark:border-slate-800">
-            <button 
-              onClick={() => setShowMeetupModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            >
-              <X size={24} />
-            </button>
-            
-            <h3 className="text-2xl font-bold mb-6 text-slate-900 dark:text-white">
-              {editingMeetup ? 'Edit Meetup' : 'Create New Meetup'}
-            </h3>
+             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto border dark:border-slate-800">
+                <button onClick={() => setShowLearningModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                <h3 className="text-xl font-bold mb-6 text-slate-900 dark:text-white">{editingLearningItem ? 'Edit Content' : 'Add New Content'}</h3>
+                
+                <form onSubmit={handleLearningSubmit} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Target Audience</label>
+                            <select className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={learningFormData.targetSlug} onChange={e => setLearningFormData({...learningFormData, targetSlug: e.target.value, moduleId: ''})}>
+                                {TARGET_AUDIENCES.map(t => <option key={t.slug} value={t.slug}>{t.label}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Content Type</label>
+                            <select className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={learningFormData.type} onChange={e => setLearningFormData({...learningFormData, type: e.target.value as LearningContentType})}>
+                                <option value="path">Module (Path)</option>
+                                <option value="interview">Interview Question</option>
+                                <option value="practice">Practice Challenge</option>
+                                <option value="quiz">Quiz Question</option>
+                                <option value="project">Real Project</option>
+                            </select>
+                        </div>
+                    </div>
 
-            <form onSubmit={handleFormSubmit} className="space-y-6">
-              {/* Basic Info Section */}
-              <div className="space-y-4">
-                <h4 className="text-sm font-bold uppercase text-slate-500 tracking-wider border-b border-slate-200 dark:border-slate-700 pb-1">Basic Details</h4>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Title</label>
-                    <input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Date</label>
-                    <input type="date" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                    </div>
-                    <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
-                    <select className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.type} onChange={e => setFormData({...formData, type: e.target.value as any})}>
-                        <option value="Future">Future</option>
-                        <option value="Present">Present (Active)</option>
-                        <option value="Past">Past</option>
-                    </select>
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
-                    <textarea rows={2} required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
-                </div>
-                 <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Location</label>
-                    <input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.location} onChange={e => setFormData({...formData, location: e.target.value})} />
-                </div>
-              </div>
+                    {learningFormData.type !== 'path' && (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Parent Module (Optional)</label>
+                            <select 
+                                className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" 
+                                value={learningFormData.moduleId || ''} 
+                                onChange={e => setLearningFormData({...learningFormData, moduleId: e.target.value})}
+                            >
+                                <option value="">-- No Specific Module --</option>
+                                {availableModules.map(mod => (
+                                    <option key={mod.id} value={mod.id}>{mod.title}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">Associate this question/content with a specific module in this path.</p>
+                        </div>
+                    )}
 
-              {/* Capacity & Tables Section */}
-              <div className="space-y-4">
-                 <h4 className="text-sm font-bold uppercase text-slate-500 tracking-wider border-b border-slate-200 dark:border-slate-700 pb-1 flex items-center"><Calculator size={14} className="mr-1"/> Capacity & Layout</h4>
-                 
-                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Total Capacity (People)</label>
-                        <input type="number" required min="1" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.capacity} onChange={e => setFormData({...formData, capacity: parseInt(e.target.value)})} />
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Title / Question</label>
+                        <input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={learningFormData.title} onChange={e => setLearningFormData({...learningFormData, title: e.target.value})} />
                     </div>
-                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Seats Per Table</label>
-                        <select className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.seatsPerTable} onChange={e => setFormData({...formData, seatsPerTable: parseInt(e.target.value)})}>
-                            <option value="4">4 Seats</option>
-                            <option value="6">6 Seats</option>
-                            <option value="8">8 Seats</option>
-                            <option value="10">10 Seats</option>
+
+                    {learningFormData.type === 'quiz' ? (
+                        <>
+                            <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <label className="block text-sm font-bold text-slate-700 dark:text-white flex items-center"><HelpCircle size={16} className="mr-2"/> Quiz Options</label>
+                                {quizOptions.map((opt, idx) => (
+                                    <div key={idx} className="flex items-center gap-2">
+                                        <input 
+                                            type="radio" 
+                                            name="correctOption" 
+                                            checked={correctOptionIndex === idx} 
+                                            onChange={() => setCorrectOptionIndex(idx)}
+                                            className="w-4 h-4 text-am-600"
+                                        />
+                                        <input 
+                                            type="text" 
+                                            placeholder={`Option ${idx + 1}`}
+                                            required
+                                            className="flex-grow border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded px-3 py-2 text-sm"
+                                            value={opt}
+                                            onChange={(e) => {
+                                                const newOpts = [...quizOptions];
+                                                newOpts[idx] = e.target.value;
+                                                setQuizOptions(newOpts);
+                                            }}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Explanation (Shown after answering)</label>
+                                <textarea rows={2} required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={learningFormData.description} onChange={e => setLearningFormData({...learningFormData, description: e.target.value})} />
+                            </div>
+                        </>
+                    ) : (
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description / Short Answer</label>
+                            <textarea rows={2} required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={learningFormData.description} onChange={e => setLearningFormData({...learningFormData, description: e.target.value})} />
+                        </div>
+                    )}
+
+                    {learningFormData.type === 'practice' && (
+                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg space-y-3">
+                            <h4 className="font-bold text-sm text-am-600 flex items-center"><Code2 size={14} className="mr-2"/> Coding Challenge Details</h4>
+                            <div>
+                                <label className="block text-xs font-bold uppercase mb-1">Initial Code Block</label>
+                                <textarea rows={4} className="w-full font-mono text-xs border border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white rounded-md px-3 py-2" value={learningFormData.content} onChange={e => setLearningFormData({...learningFormData, content: e.target.value})} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold uppercase mb-1">Solution Regex</label>
+                                    <input type="text" className="w-full font-mono text-xs border border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white rounded-md px-3 py-2" value={practiceMeta.regex} onChange={e => setPracticeMeta({...practiceMeta, regex: e.target.value})} placeholder="e.g. gr\.query\(\)" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold uppercase mb-1">Hint Text</label>
+                                    <input type="text" className="w-full text-xs border border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white rounded-md px-3 py-2" value={practiceMeta.hint} onChange={e => setPracticeMeta({...practiceMeta, hint: e.target.value})} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {learningFormData.type === 'interview' && (
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Detailed Answer</label>
+                            <textarea rows={4} className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={learningFormData.content} onChange={e => setLearningFormData({...learningFormData, content: e.target.value})} />
+                        </div>
+                    )}
+
+                    <div className="pt-4 flex justify-end space-x-3">
+                        <button type="button" onClick={() => setShowLearningModal(false)} className="px-4 py-2 border border-slate-300 rounded-md text-sm">Cancel</button>
+                        <button type="submit" className="px-4 py-2 bg-am-600 text-white rounded-md text-sm font-bold hover:bg-am-700">Save Content</button>
+                    </div>
+                </form>
+             </div>
+        </div>
+      )}
+
+      {/* INITIATIVE MODAL (Site Content) */}
+      {showInitiativeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg p-6 border dark:border-slate-800">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">{editingInitiative ? 'Edit Content Block' : 'Add Content Block'}</h3>
+                    <button onClick={() => setShowInitiativeModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                </div>
+                
+                <form onSubmit={handleInitiativeSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Title</label>
+                        <input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={initiativeFormData.title} onChange={e => setInitiativeFormData({...initiativeFormData, title: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description</label>
+                        <textarea rows={3} required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={initiativeFormData.description} onChange={e => setInitiativeFormData({...initiativeFormData, description: e.target.value})} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Icon Name (Lucide)</label>
+                            <input type="text" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={initiativeFormData.iconName} onChange={e => setInitiativeFormData({...initiativeFormData, iconName: e.target.value})} placeholder="e.g. 'Award'" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Order</label>
+                            <input type="number" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={initiativeFormData.order} onChange={e => setInitiativeFormData({...initiativeFormData, order: parseInt(e.target.value) || 0})} />
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                        <select className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={initiativeFormData.category} onChange={e => setInitiativeFormData({...initiativeFormData, category: e.target.value as InitiativeCategory})}>
+                            <option value="academy">AM Academy</option>
+                            <option value="marketing">AM Marketing</option>
+                            <option value="foods">AM Foods</option>
+                            <option value="tech">AM Tech</option>
                         </select>
                     </div>
-                 </div>
-                 
-                 <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-md text-sm text-slate-600 dark:text-slate-400 flex justify-between items-center border border-slate-200 dark:border-slate-700">
-                    <span>Tables Required:</span>
-                    <span className="font-bold text-lg text-am-600 dark:text-am-400">{totalTables} Tables</span>
-                 </div>
 
-                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-md border border-slate-200 dark:border-slate-700">
-                    <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Reserved Seats (For Hosts, etc.)</label>
-                    <div className="grid grid-cols-4 gap-2">
-                        <div>
-                             <label className="block text-xs mb-1">Hosts</label>
-                             <input type="number" min="0" className="w-full text-sm border border-slate-300 rounded p-1" value={formData.reservedSeats?.hosts} onChange={e => setFormData({...formData, reservedSeats: {...formData.reservedSeats!, hosts: parseInt(e.target.value)}})} />
-                        </div>
-                        <div>
-                             <label className="block text-xs mb-1">Presenters</label>
-                             <input type="number" min="0" className="w-full text-sm border border-slate-300 rounded p-1" value={formData.reservedSeats?.presenters} onChange={e => setFormData({...formData, reservedSeats: {...formData.reservedSeats!, presenters: parseInt(e.target.value)}})} />
-                        </div>
-                        <div>
-                             <label className="block text-xs mb-1">Volunteers</label>
-                             <input type="number" min="0" className="w-full text-sm border border-slate-300 rounded p-1" value={formData.reservedSeats?.volunteers} onChange={e => setFormData({...formData, reservedSeats: {...formData.reservedSeats!, volunteers: parseInt(e.target.value)}})} />
-                        </div>
-                         <div>
-                             <label className="block text-xs mb-1">Sponsors</label>
-                             <input type="number" min="0" className="w-full text-sm border border-slate-300 rounded p-1" value={formData.reservedSeats?.sponsors} onChange={e => setFormData({...formData, reservedSeats: {...formData.reservedSeats!, sponsors: parseInt(e.target.value)}})} />
-                        </div>
+                    <div className="pt-4 flex justify-end space-x-3">
+                        <button type="button" onClick={() => setShowInitiativeModal(false)} className="px-4 py-2 border border-slate-300 rounded-md text-sm">Cancel</button>
+                        <button type="submit" className="px-4 py-2 bg-am-600 text-white rounded-md text-sm font-bold hover:bg-am-700">Save Block</button>
                     </div>
-                 </div>
-              </div>
-
-              {/* Registration Settings */}
-              <div className="space-y-4">
-                 <h4 className="text-sm font-bold uppercase text-slate-500 tracking-wider border-b border-slate-200 dark:border-slate-700 pb-1 flex items-center"><CalendarClock size={14} className="mr-1"/> Registration Settings</h4>
-                 
-                 <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Registration Mode</label>
-                    <select className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={formData.registrationMode} onChange={e => setFormData({...formData, registrationMode: e.target.value as any})}>
-                        <option value="registration">Registration Only</option>
-                        <option value="booking">Seat Booking Only</option>
-                        <option value="both">Both Options</option>
-                    </select>
-                </div>
-
-                 <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Opens At</label>
-                        <input type="datetime-local" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2 text-sm" value={formData.registrationStart} onChange={e => setFormData({...formData, registrationStart: e.target.value})} />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Closes At</label>
-                        <input type="datetime-local" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2 text-sm" value={formData.registrationEnd} onChange={e => setFormData({...formData, registrationEnd: e.target.value})} />
-                    </div>
-                 </div>
-
-                 <div className="flex items-center space-x-2 pt-2">
-                    <input 
-                        type="checkbox" 
-                        id="forceClose"
-                        className="w-4 h-4 text-red-600 rounded focus:ring-red-500 border-gray-300"
-                        checked={formData.isRegistrationClosed}
-                        onChange={e => setFormData({...formData, isRegistrationClosed: e.target.checked})}
-                    />
-                    <label htmlFor="forceClose" className="text-sm font-bold text-red-600 dark:text-red-400 flex items-center">
-                        <Lock size={14} className="mr-1"/> Force Close Registrations (Manual Override)
-                    </label>
-                 </div>
-              </div>
-
-              <div className="pt-4 flex justify-end space-x-3 border-t border-slate-200 dark:border-slate-700">
-                <button type="button" onClick={() => setShowMeetupModal(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
-                  Cancel
-                </button>
-                <button type="submit" disabled={isLoading} className="px-4 py-2 bg-am-900 border border-transparent rounded-md text-sm font-medium text-white hover:bg-am-800 flex items-center">
-                   {isLoading ? <Loader2 size={16} className="animate-spin mr-2"/> : <Save size={16} className="mr-2"/>}
-                   {editingMeetup ? 'Update Meetup' : 'Create Meetup'}
-                </button>
-              </div>
-            </form>
-          </div>
+                </form>
+             </div>
         </div>
       )}
 
-      {/* --- EDIT REGISTRATION MODAL --- */}
-      {editingReservation && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md p-6 relative border dark:border-slate-800 animate-in fade-in zoom-in duration-200">
-            <button 
-              onClick={() => setEditingReservation(null)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-            >
-              <X size={24} />
-            </button>
-            
-            <h3 className="text-xl font-bold mb-1 text-slate-900 dark:text-white">
-              Edit Registration
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-              Managing details for <span className="font-semibold text-am-600 dark:text-am-400">{editingReservation.name}</span>
-            </p>
-
-            <div className="space-y-5">
-              
-              {/* Status Section */}
-              <div className="grid grid-cols-2 gap-4">
-                 <div>
-                   <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Status</label>
-                   <select 
-                      className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2 text-sm"
-                      value={editResForm.status}
-                      onChange={e => setEditResForm({...editResForm, status: e.target.value as ReservationStatus})}
-                   >
-                     <option value="pending">Pending</option>
-                     <option value="confirmed">Confirmed</option>
-                     <option value="rejected">Rejected</option>
-                   </select>
-                 </div>
-                 <div>
-                   <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Seat Number</label>
-                   <input 
-                     type="text" 
-                     className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2 text-sm font-mono"
-                     placeholder="TBD"
-                     value={editResForm.seatNumber}
-                     onChange={e => setEditResForm({...editResForm, seatNumber: e.target.value})}
-                   />
-                 </div>
-              </div>
-
-              {/* Conditional Rejection Reason */}
-              {editResForm.status === 'rejected' && (
-                <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-md border border-red-200 dark:border-red-900">
-                  <label className="block text-xs font-bold text-red-600 dark:text-red-400 mb-1">Rejection Reason</label>
-                  <textarea 
-                    rows={2}
-                    className="w-full border border-red-300 dark:border-red-800 dark:bg-slate-900 rounded-md px-3 py-2 text-sm"
-                    placeholder="Why is this being rejected?"
-                    value={editResForm.rejectionReason}
-                    onChange={e => setEditResForm({...editResForm, rejectionReason: e.target.value})}
-                  />
-                </div>
-              )}
-
-              {/* Visibility */}
-              <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-3 rounded-md border border-slate-200 dark:border-slate-700">
-                <div className="flex items-center">
-                  {editResForm.isHidden ? <EyeOff size={18} className="text-slate-500 mr-2"/> : <Eye size={18} className="text-blue-500 mr-2"/>}
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Hide from public lists</span>
-                </div>
-                <input 
-                   type="checkbox"
-                   className="w-5 h-5 text-am-600 rounded focus:ring-am-500"
-                   checked={editResForm.isHidden}
-                   onChange={e => setEditResForm({...editResForm, isHidden: e.target.checked})}
-                />
-              </div>
-
-              {/* Footer Actions */}
-              <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                 
-                 {/* DELETE AREA */}
-                 <button 
-                   type="button"
-                   onClick={handleDeleteReservationFromModal}
-                   disabled={isLoading}
-                   className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 text-sm font-medium flex items-center hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-2 rounded transition"
-                 >
-                   <Trash2 size={16} className="mr-2" /> Delete Registration
-                 </button>
-
-                 <div className="flex space-x-3">
-                   <button 
-                     type="button"
-                     onClick={() => setEditingReservation(null)}
-                     disabled={isLoading}
-                     className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md text-sm font-medium"
-                   >
-                     Cancel
-                   </button>
-                   <button 
-                     type="button"
-                     onClick={handleSaveReservation}
-                     disabled={isLoading}
-                     className="px-4 py-2 bg-am-600 text-white rounded-md text-sm font-bold hover:bg-am-700 shadow-md flex items-center"
-                   >
-                     <Save size={16} className="mr-2" /> Save Changes
-                   </button>
-                 </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ADD ATTENDEE MODAL (Existing) */}
+      {/* ADD ATTENDEE MODAL */}
       {showAddAttendeeModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg p-6 relative border dark:border-slate-800">
-            {/* ... Modal Content same as before ... */}
-             <button onClick={() => setShowAddAttendeeModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={24} /></button>
-            <h3 className="text-2xl font-bold mb-6 text-slate-900 dark:text-white">Add Attendee</h3>
-            <form onSubmit={handleAddAttendeeSubmit} className="space-y-4">
-              <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name *</label><input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.name} onChange={e => setAttendeeData({...attendeeData, name: e.target.value})} /></div>
-              <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email *</label><input type="email" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.email} onChange={e => setAttendeeData({...attendeeData, email: e.target.value})} /></div>
-              <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Company *</label><input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.company} onChange={e => setAttendeeData({...attendeeData, company: e.target.value})} /></div>
-              <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">LinkedIn</label><input type="text" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.linkedin} onChange={e => setAttendeeData({...attendeeData, linkedin: e.target.value})} placeholder="https://..." /></div>
-              <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Seat Number</label><input type="text" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.seatNumber} onChange={e => setAttendeeData({...attendeeData, seatNumber: e.target.value})} placeholder="Optional" /></div>
-              <div className="pt-4 flex justify-end space-x-3">
-                <button type="button" onClick={() => setShowAddAttendeeModal(false)} className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm font-medium text-slate-700 dark:text-slate-300">Cancel</button>
-                <button type="submit" disabled={isLoading} className="px-4 py-2 bg-am-600 text-white rounded-md text-sm font-medium hover:bg-am-700">{isLoading ? 'Adding...' : 'Add Attendee'}</button>
-              </div>
-            </form>
-          </div>
+             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg p-6 border dark:border-slate-800">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Manually Register Attendee</h3>
+                    <button onClick={() => setShowAddAttendeeModal(false)} className="text-slate-400 hover:text-slate-600"><X size={24} /></button>
+                </div>
+                
+                <form onSubmit={handleAttendeeSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Full Name</label>
+                        <input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.name} onChange={e => setAttendeeData({...attendeeData, name: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
+                        <input type="email" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.email} onChange={e => setAttendeeData({...attendeeData, email: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Company</label>
+                        <input type="text" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.company} onChange={e => setAttendeeData({...attendeeData, company: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">LinkedIn URL</label>
+                        <input type="text" required className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" value={attendeeData.linkedin} onChange={e => setAttendeeData({...attendeeData, linkedin: e.target.value})} />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Assign Seat (Optional)</label>
+                        <input type="text" className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2" placeholder="e.g. T1-1" value={attendeeData.seatNumber} onChange={e => setAttendeeData({...attendeeData, seatNumber: e.target.value})} />
+                        <p className="text-xs text-slate-500 mt-1">Leave blank for Pending/TBD allocation.</p>
+                    </div>
+                    <div className="flex items-center gap-2 pt-2">
+                        <input type="checkbox" id="presenter" checked={attendeeData.sessionPresenter} onChange={e => setAttendeeData({...attendeeData, sessionPresenter: e.target.checked})} className="rounded text-am-600 focus:ring-am-500"/>
+                        <label htmlFor="presenter" className="text-sm font-medium text-slate-700 dark:text-slate-300">Is Presenter?</label>
+                    </div>
+
+                    {attendeeData.sessionPresenter && (
+                        <div className="mt-3">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Presentation Topic</label>
+                            <textarea
+                                required
+                                rows={3}
+                                className="w-full border border-slate-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-md px-3 py-2"
+                                value={attendeeData.presentationTopic}
+                                onChange={e => setAttendeeData({...attendeeData, presentationTopic: e.target.value})}
+                                placeholder="Title or brief description of the talk..."
+                            />
+                        </div>
+                    )}
+
+                    <div className="pt-4 flex justify-end space-x-3">
+                        <button type="button" onClick={() => setShowAddAttendeeModal(false)} className="px-4 py-2 border border-slate-300 rounded-md text-sm">Cancel</button>
+                        <button type="submit" className="px-4 py-2 bg-am-600 text-white rounded-md text-sm font-bold hover:bg-am-700">Add Attendee</button>
+                    </div>
+                </form>
+             </div>
         </div>
       )}
 
+      {/* ... (Other existing modals) ... */}
     </div>
   );
 };

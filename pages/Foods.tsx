@@ -1,7 +1,28 @@
-import React from 'react';
-import { Utensils, ShoppingBag, Store, Truck } from 'lucide-react';
+
+import React, { useState, useEffect } from 'react';
+import { Utensils, ShoppingBag, Store, Box } from 'lucide-react';
+import { getInitiatives } from '../services/mockDb';
+import { Initiative } from '../types';
 
 const Foods: React.FC = () => {
+  const [content, setContent] = useState<Initiative[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getInitiatives('foods').then(data => {
+        setContent(data);
+        setLoading(false);
+    });
+  }, []);
+
+  const getIcon = (name: string) => {
+      switch(name.toLowerCase()) {
+          case 'store': return <Store size={64} className="text-slate-400" />;
+          case 'bag': return <ShoppingBag size={64} className="text-slate-400" />;
+          default: return <Box size={64} className="text-slate-400" />;
+      }
+  }
+
   return (
     <div className="bg-slate-50 dark:bg-slate-950 min-h-screen">
       {/* Hero */}
@@ -18,27 +39,47 @@ const Foods: React.FC = () => {
       {/* Offerings */}
       <section className="py-16 container mx-auto px-4">
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          <div className="bg-white dark:bg-slate-900 overflow-hidden rounded-2xl shadow-lg group">
-             <div className="h-48 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-                <Store size={64} className="text-slate-400" />
-             </div>
-             <div className="p-8">
-               <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Cloud Kitchens</h3>
-               <p className="text-slate-600 dark:text-slate-400 mb-4">Hygienic, fast, and delicious. Our cloud kitchens serve authentic regional cuisines across 3 cities.</p>
-               <button className="text-foods-600 font-bold hover:underline">View Menu & Order &rarr;</button>
-             </div>
-          </div>
-          
-          <div className="bg-white dark:bg-slate-900 overflow-hidden rounded-2xl shadow-lg group">
-             <div className="h-48 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-                <ShoppingBag size={64} className="text-slate-400" />
-             </div>
-             <div className="p-8">
-               <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Packaged Foods</h3>
-               <p className="text-slate-600 dark:text-slate-400 mb-4">Premium spices, ready-to-eat mixes, and snacks delivered to your doorstep.</p>
-               <button className="text-foods-600 font-bold hover:underline">Browse Products &rarr;</button>
-             </div>
-          </div>
+          {loading ? (
+             <div className="col-span-2 text-center text-slate-500">Loading food concepts...</div>
+          ) : content.length > 0 ? (
+             content.map(item => (
+                <div key={item.id} className="bg-white dark:bg-slate-900 overflow-hidden rounded-2xl shadow-lg group">
+                    <div className="h-48 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                       {getIcon(item.iconName || '')}
+                    </div>
+                    <div className="p-8">
+                        <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">{item.title}</h3>
+                        <p className="text-slate-600 dark:text-slate-400 mb-4">{item.description}</p>
+                        <button className="text-foods-600 font-bold hover:underline">View Details &rarr;</button>
+                    </div>
+                </div>
+             ))
+          ) : (
+             /* Default Static Content */
+             <>
+                <div className="bg-white dark:bg-slate-900 overflow-hidden rounded-2xl shadow-lg group">
+                    <div className="h-48 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                        <Store size={64} className="text-slate-400" />
+                    </div>
+                    <div className="p-8">
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Cloud Kitchens</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">Hygienic, fast, and delicious. Our cloud kitchens serve authentic regional cuisines across 3 cities.</p>
+                    <button className="text-foods-600 font-bold hover:underline">View Menu & Order &rarr;</button>
+                    </div>
+                </div>
+                
+                <div className="bg-white dark:bg-slate-900 overflow-hidden rounded-2xl shadow-lg group">
+                    <div className="h-48 bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+                        <ShoppingBag size={64} className="text-slate-400" />
+                    </div>
+                    <div className="p-8">
+                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Packaged Foods</h3>
+                    <p className="text-slate-600 dark:text-slate-400 mb-4">Premium spices, ready-to-eat mixes, and snacks delivered to your doorstep.</p>
+                    <button className="text-foods-600 font-bold hover:underline">Browse Products &rarr;</button>
+                    </div>
+                </div>
+             </>
+          )}
         </div>
       </section>
 
